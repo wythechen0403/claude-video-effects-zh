@@ -55,7 +55,7 @@ _tg = _patch(fx.fx_tier_list, [
     # title in front of the speaker, just above the board (close-ups leave no room above the head)
     ("place(c, ttl, W / 2, max(ttl.height * 0.6, c.fy - c.fw * 1.65), 0.9 + 0.1 * ease_out(c.lt / 0.3), 0, al * clamp(c.lt / 0.15), behind=True)", "pass"),
     ("k = ease_back(c.lt / 0.35)",
-     "place(c, ttl, W / 2, top - ttl.height * 0.45, 0.9 + 0.1 * ease_out(c.lt / 0.3), 0, al * clamp(c.lt / 0.15), guard=False); k = ease_back(c.lt / 0.35)"),
+     "place(c, ttl, W / 2, top - ttl.height * 0.45, 0.9 + 0.1 * ease_out(c.lt / 0.3), 0, al * clamp(c.lt / 0.15), behind=True); k = ease_back(c.lt / 0.35)"),
     ("fill=(225, 225, 230, 255)", "fill=(255, 255, 255, 255)"),
     ("return shadowed(im, 18, 10, 120)", "return im"),
     ("place(c, bd, bx, by, 1, 0, al * clamp(c.lt / 0.12), guard=True)",
@@ -95,13 +95,16 @@ def fx_scribble_track(c, e):
     # label on the emptier side of the frame, arrow to the ring
     right = cx < c.W / 2
     lx = c.W * (0.74 if right else 0.26); ly = fx.clamp(cy - ry * 0.9, c.H * 0.1, c.H * 0.85)
+    if 'lx' in e.o: lx = c.W * float(e.o['lx'])
+    if 'ly' in e.o: ly = c.H * float(e.o['ly'])
     tx, ty = cx + (rx * 0.75 if right else -rx * 0.75), cy - ry * 0.55
-    pts = fx.arrow_pts(lx, ly + c.W * 0.06, tx, ty, 0.3 if right else -0.3)
+    bend = float(e.o.get('bend', 0.3)) * (1 if right else -1)
+    pts = fx.arrow_pts(lx, ly + c.W * 0.06, tx, ty, bend)
     k2 = fx.ease_out((c.lt - 0.45) / 0.35)
     if k2 > 0: fx.hand_path(d, pts, col, wd, k2)
     if k2 >= 0.99: fx.arrow_head(d, pts, col, wd, c.W * 0.035)
     al = fx.clamp((e.d - c.lt) / 0.2)
-    fx.comp(c, fx.to_np(lay), 0, 0, al)
+    fx.comp(c, fx.to_np(lay), 0, 0, al, guard=True)  # never draw over the face
     if c.lt > 0.7:
         lab = fx.text_img(e.o.get('text', '看這裡'), c.W * 0.08, 'hand', col[:3], shadow=6)
         fx.place(c, lab, lx, ly, 0.7 + 0.3 * fx.ease_back((c.lt - 0.7) / 0.3), -6 if right else 6, al)

@@ -111,7 +111,8 @@ Aliases work too: `bill`, `to-do`, `follow`, `stamp`, `countdown`, `cover`, `rai
 - `scribble-track`: a hand-drawn ring that follows an object (a product, a cup, a book), with an arrow and a label. Steps:
   1. Save the first frame of the effect (`ffmpeg -ss <start> -i <video> -frames:v 1 first.png`) and look at it to find the object's box in pixels.
   2. `.venv/bin/python scripts/track_object.py <video> track.json --box X,Y,W,H --at <start> --check track_check.jpg`, then look at `track_check.jpg`. If the box drifts off the object, try a tighter box or a clearer start frame once.
-  3. Effect options: `track=track.json`, `text` (label), `color`, `pad` (ring size, default 1.12).
+  3. Effect options: `track=track.json`, `text` (label), `color`, `pad` (ring size, default 1.12), `lx`/`ly` (label position, 0 to 1; put it in empty space beside the head, never on the body), `bend` (arrow curve; flip the sign so the arrow bows away from the face). The ring and arrow are never drawn over the face.
+  Framing tip: shoot product clips from mid-thigh up so the product is big enough for the ring.
 - `glass-text`: a giant see-through glass word behind the speaker, light bends through the letters and a light sweep passes over. Options: `text`, `y` (0 to 1), `font` (default `anton`; Chinese uses Noto Sans TC), `tint`, `refract`. Best on plain walls.
 - `glow-chart`: a glowing line chart draws itself across the frame while a big number counts up; the room dims a little (not the person) so the glow reads. Options: `to` (e.g. `+320%`), `text` (label under the number), `values` (points with `|`), `color`, `dim`, `draw` (seconds to draw the line). Time it to a raised hand.
 - `chat-drop`: a cream chat window springs down into the space above the head; the request bubble pops in, typing dots, then the reply types out. Options: `ask`, `text` (reply), `name`, `color`, `y`, `bar=1` (adds an input bar; makes the card taller). Needs headroom above the head.
