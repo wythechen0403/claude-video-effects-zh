@@ -48,6 +48,19 @@
 
 其他 40 多種特效的名稱和說明，請看 `SKILL.md` 裡的表格，或直接問 Claude「有哪些特效可以用？」。
 
+## 第二彈：4 種新特效
+
+| 特效 | 複製這句 |
+|---|---|
+| 透明玻璃文字 | `/effects-zh glass-text 從 0 到 5 秒，背後的玻璃字寫「CLAUDE」` |
+| 發光折線圖 | `/effects-zh glow-chart 講到「＿＿」舉手的時候，數字跳到「+320%」，下面寫「觀看成長」` |
+| 對話框降下 | `/effects-zh chat-drop 從 3 秒開始，我問「幫我把這支影片加上特效」，Claude 回「好的，九種特效都加好了」` |
+| 真實手機畫面 | `/effects-zh phone-mock 我舉起手機的時候，手機放在左邊，請求是「剪掉前 3 秒加字幕」，步驟：「找到開頭空白」「剪掉前 3 秒」「加上中文字幕」` |
+
+拍攝建議：素面牆、鏡頭固定、頭頂留約 1/5 畫面、人物兩側留空。`phone-mock` 用的手機圖在 `assets/phone_mockup.png`，想換款式就產一張螢幕是純綠色（#00FF00）的手機圖取代它。
+
+`phone-orbit`（手機上旋轉的圖卡）還在實驗中：人物要站在畫面一側、另一側留大空間，效果才好。
+
 ## 拍攝小提醒
 
 - **鏡頭固定**最好，手持也能用，但特效容易跟著晃
@@ -60,7 +73,8 @@
 | 檔案 | 內容 |
 |---|---|
 | `scripts/fx_zh.py` | 中文字自動換成思源黑體，粗細會配合原本的英文字型 |
-| `scripts/fx_wythe.py` | 新特效 `tier-glass`、`scribble-track`，以及 `profile-wall`、`glass-widgets` 的位置選項 |
+| `scripts/fx_wythe.py` | 新特效 `tier-glass`、`scribble-track`、`glass-text`、`glow-chart`、`chat-drop`、`phone-mock`、`phone-orbit`（實驗中），以及 `profile-wall`、`glass-widgets` 的位置選項 |
+| `assets/phone_mockup.png` | `phone-mock` 用的手機圖（綠幕螢幕） |
 | `scripts/track_object.py` | 物品追蹤，讓塗鴉圈跟著物品移動 |
 | `fonts/NotoSansTC-VF.ttf` | 思源黑體繁中版（SIL OFL 授權，可商用） |
 
