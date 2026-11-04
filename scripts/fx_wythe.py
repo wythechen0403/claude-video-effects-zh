@@ -540,6 +540,180 @@ def fx_phone_orbit(c, e):
     draw(front)
 
 
+# phone pop-out: the shot plays inside a big phone, then the speaker jumps out of the screen to full size
+@fx.effect('phone-pop', 'the shot plays on a big phone screen, then you jump out of the phone to full size')
+def fx_phone_pop(c, e):
+    import math
+    import numpy as np, cv2
+    from PIL import Image
+    W, H = c.W, c.H; T = e.d; t = c.lt
+    orig = c.img.copy(); m = np.clip(c.m, 0, 1)
+    # clean plate: paint the person out (cheap, at quarter size; works best on plain walls)
+    q = 4; sm = cv2.resize(orig, (W // q, H // q), interpolation=cv2.INTER_AREA)
+    pm = (cv2.resize(m, (W // q, H // q)) > 0.04).astype(np.uint8)
+    # light pixels touching the person (white shoes, highlights the matte misses)
+    near = cv2.dilate(pm, np.ones((9, 9), np.uint8), iterations=2)
+    pm = np.maximum(pm, ((sm.min(axis=2) > 0.78) & (near > 0)).astype(np.uint8))
+    mm = cv2.dilate(pm, np.ones((5, 5), np.uint8), iterations=3)
+    plate = cv2.inpaint((sm * 255).astype(np.uint8), mm, 9, cv2.INPAINT_TELEA).astype(np.float32) / 255
+    plate = cv2.GaussianBlur(cv2.resize(plate, (W, H), interpolation=cv2.INTER_CUBIC), (0, 0), 2)
+    mb = cv2.GaussianBlur(cv2.resize(mm.astype(np.float32), (W, H)), (0, 0), 6)[..., None]
+    plate = orig * (1 - mb) + plate * mb
+    # beats
+    t_in, t_pop, t_out = 0.22 * T, 0.5 * T, 0.75 * T
+    k_in = fx.ease_back(t / t_in); pop = fx.ease_back((t - t_in) / (t_pop - t_in)) if t > t_in else 0.0
+    k_out = fx.ease_inout((t - t_pop) / (t_out - t_pop)) if t > t_pop else 0.0
+    done = fx.clamp((t - t_out) / 0.2)
+    # the phone: the shot (with the person) on its screen until the jump
+    ph = H * float(e.o.get('size', 0.62)); pcx, pcy = W / 2, H * float(e.o.get('y', 0.55))
+    pcy += k_out * H * 0.75
+    scr_img = Image.fromarray((np.clip(orig if t < t_in else plate, 0, 1) * 255).astype(np.uint8)).resize((460, 818))
+    phone, shadow, quad = _real_phone(c, e, scr_img, False, key='asset-pop')
+    sc = ph / phone.height
+    c.img = plate.copy()
+    if k_out < 1:
+        fx.place(c, shadow.resize((max(1, int(shadow.width * sc)), max(1, int(shadow.height * sc)))), pcx + W * 0.03, pcy + H * 0.035, 0.6 + 0.4 * k_in, 0, 0.5 * (1 - k_out))
+        fx.place(c, phone.resize((max(1, int(phone.width * sc)), max(1, int(phone.height * sc))), Image.LANCZOS), pcx, pcy, 0.6 + 0.4 * k_in, 0, fx.clamp(t / 0.1) * (1 - k_out))
+    if t >= t_in:
+        # the person scales from the screen's size and centre to full size at the real position
+        ys, xs = np.nonzero(m > 0.3)
+        if len(xs):
+            bx, by = (xs.min() + xs.max()) / 2, (ys.min() + ys.max()) / 2
+            qc = quad.mean(0); qh = np.linalg.norm(quad[3] - quad[0])
+            s0 = (qh * sc) / H * 0.9
+            s = s0 + (1 - s0) * pop
+            sx0, sy0 = pcx + (qc[0] - phone.width / 2) * sc, pcy + (qc[1] - phone.height / 2) * sc
+            tx = sx0 + (bx - sx0) * pop; ty = sy0 + (by - sy0) * pop - math.sin(min(1, pop) * math.pi) * H * 0.05
+            A = np.float32([[s, 0, tx - s * bx], [0, s, ty - s * by]])
+            lay = cv2.warpAffine(np.dstack([orig, m]), A, (W, H), flags=cv2.INTER_LINEAR)
+            a = lay[..., 3:4]
+            c.img = c.img * (1 - a) + lay[..., :3] * a
+    if done > 0: c.img = c.img * (1 - done) + orig * done
+
+
+# paper collage: the room turns into a cut-paper collage, you become a sticker with a white edge, paper letters pop in
+def _torn(points, rng, amp):
+    """Densify a polygon and jitter its edge so it looks torn."""
+    out = []
+    for i in range(len(points)):
+        (x0, y0), (x1, y1) = points[i], points[(i + 1) % len(points)]
+        n = max(2, int(((x1 - x0) ** 2 + (y1 - y0) ** 2) ** 0.5 / (amp * 3)))
+        for j in range(n):
+            t = j / n; out.append((x0 + (x1 - x0) * t + rng.uniform(-amp, amp), y0 + (y1 - y0) * t + rng.uniform(-amp, amp)))
+    return out
+
+
+def _pattern(w, h, kind, base, ink, u):
+    from PIL import Image, ImageDraw
+    im = Image.new('RGB', (w, h), base); d = ImageDraw.Draw(im)
+    if kind == 'dots':
+        st = int(26 * u); r = 7 * u
+        for y in range(0, h + st, st):
+            for x in range(0, w + st, st):
+                ox = st / 2 if (y // st) % 2 else 0
+                d.ellipse([x + ox - r, y - r, x + ox + r, y + r], fill=ink)
+    elif kind == 'stripes':
+        st = int(34 * u)
+        for x in range(-h, w + h, st): d.line([(x, 0), (x + h, h)], fill=ink, width=int(12 * u))
+    elif kind == 'zigzag':
+        st = int(40 * u)
+        for y in range(0, h + st, st):
+            pts = [(x, y + (st / 3 if (x // st) % 2 else 0)) for x in range(0, w + st, st)]
+            d.line(pts, fill=ink, width=int(8 * u))
+    return im
+
+
+@fx.effect('paper-collage', 'the room becomes a cut-paper collage, you become a sticker with a white edge, paper letters pop in')
+def fx_paper_collage(c, e):
+    import os, random
+    import numpy as np, cv2
+    from PIL import Image, ImageDraw
+    W, H = c.W, c.H; u = W / 1080
+    fps_stop = float(e.o.get('stop', 8)); step = int(c.lt * fps_stop)  # stop-motion beats
+    def build():
+        rng = random.Random(int(e.o.get('seed', 7)))
+        bg = Image.new('RGB', (W, H), (250, 244, 232))
+        pal = [((255, 92, 140), (255, 210, 225)), ((255, 214, 64), (255, 245, 190)), ((62, 200, 120), (200, 245, 215)),
+               ((238, 52, 46), (255, 200, 190)), ((80, 150, 255), (205, 225, 255))]
+        kinds = ['dots', 'stripes', 'zigzag', 'dots', 'none', 'stripes', 'dots']
+        pieces = []
+        for i in range(7):
+            base, ink = pal[i % len(pal)]
+            cx, cy = rng.uniform(-0.1, 1.1) * W, rng.uniform(0.0, 1.0) * H
+            rw, rh = rng.uniform(0.35, 0.7) * W, rng.uniform(0.18, 0.4) * H
+            ang = rng.uniform(-0.5, 0.5)
+            corners = [(-rw / 2, -rh / 2), (rw / 2, -rh / 2), (rw / 2, rh / 2), (-rw / 2, rh / 2)]
+            import math as _m
+            poly = [(cx + x * _m.cos(ang) - y * _m.sin(ang), cy + x * _m.sin(ang) + y * _m.cos(ang)) for x, y in corners]
+            poly = _torn(poly, rng, 6 * u)
+            k = kinds[i % len(kinds)]
+            pat = _pattern(W, H, k, ink if k != 'none' else base, base, u) if k != 'none' else Image.new('RGB', (W, H), base)
+            pieces.append((poly, pat))
+        for poly, pat in pieces:
+            m = Image.new('L', (W, H), 0); ImageDraw.Draw(m).polygon(poly, fill=255)
+            sh = Image.new('L', (W, H), 0); ImageDraw.Draw(sh).polygon([(x + 8 * u, y + 10 * u) for x, y in poly], fill=90)
+            bg.paste((0, 0, 0), (0, 0), sh.filter(__import__('PIL.ImageFilter', fromlist=['x']).GaussianBlur(10 * u)))
+            bg.paste(pat, (0, 0), m)
+        arr = np.asarray(bg, np.float32) / 255
+        tex_path = e.o.get('paper', os.path.join(fx.ROOT, 'assets', 'paper_texture.png'))
+        if os.path.exists(tex_path):
+            tex = np.asarray(Image.open(tex_path).convert('L').resize((W, H)), np.float32) / 255
+            tex = 0.82 + 0.18 * (tex / max(1e-3, tex.mean()))
+        else:
+            n = np.random.default_rng(3).normal(0, 1, (H // 2, W // 2)).astype(np.float32)
+            tex = 1 + 0.035 * cv2.resize(cv2.GaussianBlur(n, (0, 0), 1.2), (W, H))
+        return np.clip(arr * tex[..., None], 0, 1)
+    bg = fx.cached(e, 'collage', build)
+    rng = np.random.default_rng(step)
+    jx, jy = rng.uniform(-3, 3, 2) * u  # tiny stop-motion wobble
+    k = fx.clamp(c.lt / 0.35); out = fx.clamp((e.d - c.lt) / 0.25)
+    orig = c.img.copy(); m = np.clip(c.m, 0, 1)
+    # wipe the collage in from the left in stop-motion steps
+    edge = W * (int(k * 4) / 4 if k < 1 else 1)
+    reveal = (np.arange(W)[None, :] < edge).astype(np.float32)[..., None] * out
+    M = np.float32([[1, 0, jx], [0, 1, jy]])
+    bgj = cv2.warpAffine(bg, M, (W, H), borderMode=cv2.BORDER_REFLECT)
+    canvas = orig * (1 - reveal) + bgj * reveal
+    # sticker: white edge and a soft shadow around the person
+    pm = (m > 0.4).astype(np.uint8)
+    ring = cv2.dilate(pm, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (int(26 * u) | 1, int(26 * u) | 1))).astype(np.float32)
+    ring = cv2.GaussianBlur(ring, (0, 0), 1.5)[..., None] * reveal
+    shad = cv2.GaussianBlur(np.roll(np.roll(ring[..., 0], int(12 * u), 0), int(10 * u), 1), (0, 0), 10 * u)[..., None] * 0.35
+    canvas = canvas * (1 - shad)
+    canvas = canvas * (1 - ring) + ring  # white
+    canvas = canvas * (1 - m[..., None]) + orig * m[..., None]
+    c.img = canvas
+    # paper letters pop in one by one along the top
+    txt = e.o.get('text', 'PAPER')
+    chars = [ch for ch in txt if ch.strip()]
+    if chars:
+        n = len(chars); size = min(W * 0.2, W * 0.86 / n)
+        pal = [(238, 52, 46), (255, 255, 255), (30, 30, 34), (255, 214, 64), (62, 200, 120)]
+        for i, ch in enumerate(chars):
+            t0 = 0.25 + i * 0.12
+            if c.lt < t0: break
+            r = random.Random(i * 31 + 5)
+            col = pal[i % len(pal)]; fg = (255, 255, 255) if col in [(238, 52, 46), (30, 30, 34), (62, 200, 120)] else (30, 30, 34)
+            tile = fx.cached(e, f'tile{i}', lambda ch=ch, col=col, fg=fg, r=r: _paper_tile(ch, size, col, fg, r, u))
+            x = W * 0.07 + size * 0.55 + i * size * 0.98; y = H * float(e.o.get('y', 0.1)) + r.uniform(-0.25, 0.25) * size * 0.4
+            rot = r.uniform(-9, 9) + (rng.uniform(-1.5, 1.5) if step % 2 else 0)
+            sc = 1.25 - 0.25 * fx.clamp((c.lt - t0) / 0.12)
+            fx.place(c, tile, x + jx, y + jy, sc, rot, out, behind=True)
+
+
+def _paper_tile(ch, size, col, fg, r, u):
+    from PIL import Image, ImageDraw, ImageFilter
+    f = fx.font('anton', size * 0.82)
+    w = int(size * 0.95); h = int(size * 1.15)
+    im = Image.new('RGBA', (w + 40, h + 40), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    poly = _torn([(20, 20), (20 + w, 20), (20 + w, 20 + h), (20, 20 + h)], r, 3 * u)
+    sh = Image.new('RGBA', im.size, (0, 0, 0, 0)); ImageDraw.Draw(sh).polygon([(x + 6, y + 8) for x, y in poly], fill=(0, 0, 0, 110))
+    im.alpha_composite(sh.filter(ImageFilter.GaussianBlur(6)))
+    d.polygon(poly, fill=col + (255,))
+    d.text((20 + w / 2, 20 + h / 2), ch, font=f, fill=fg + (255,), anchor='mm')
+    return im
+
+
 fx.CARD_FX = tuple(fx.CARD_FX) + ('phone-orbit',)
 
 if __name__ == '__main__':
