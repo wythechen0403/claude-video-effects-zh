@@ -519,8 +519,8 @@ def fx_phone_orbit(c, e):
     # the ring sits just above the phone's screen top
     top = py - ph * s / 2
     rise = fx.ease_out((c.lt - 0.25) / 0.6)
-    ox = px; oy = top + (1 - rise) * ph * 0.35 - H * 0.07 * rise
-    rx = min(W * float(e.o.get('radius', 0.15)), (px if sgn == 1 else W - px) - cw * 0.55) * rise; ry = H * 0.045 * rise
+    ox = px; oy = top + (1 - rise) * ph * 0.35 - H * float(e.o.get('lift', 0.07)) * rise
+    rx = min(W * float(e.o.get('radius', 0.15)), (px if sgn == 1 else W - px) - cw * 0.55) * rise; ry = H * float(e.o.get('ring', 0.045)) * rise
     items = []
     for i in range(K):
         th = i * 2 * math.pi / K + c.lt * float(e.o.get('speed', 1.6))
