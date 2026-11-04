@@ -48,7 +48,7 @@
 
 其他 40 多種特效的名稱和說明，請看 `SKILL.md` 裡的表格，或直接問 Claude「有哪些特效可以用？」。
 
-## 第二彈：5 種新特效
+## 第二彈：新特效
 
 | 特效 | 複製這句 |
 |---|---|
@@ -57,6 +57,9 @@
 | 對話框降下 | `/effects-zh chat-drop 從 3 秒開始，我問「幫我把這支影片加上特效」，Claude 回「好的，九種特效都加好了」` |
 | 真實手機畫面 | `/effects-zh phone-mock 我舉起手機的時候，手機放在左邊，請求是「剪掉前 3 秒加字幕」，步驟：「找到開頭空白」「剪掉前 3 秒」「加上中文字幕」` |
 | 剪紙拼貼 | `/effects-zh paper-collage 從 0 到 4 秒，紙片字母拼出「剪紙特效」` |
+| 訊息卡牆 | `/effects-zh headline-cards 從 0 到 5 秒，各地訊息越疊越滿` |
+| 雜誌封面 | `/effects-zh magazine-cover 從 0 到 5 秒，刊名「STUDIO」，直排標題「一句話｜剪出一支片」` |
+| 蠟筆塗鴉 | `/effects-zh crayon-doodle 從 0 到 5 秒` |
 
 拍攝建議：素面牆、鏡頭固定、頭頂留約 1/5 畫面、人物兩側留空。`phone-mock` 用的手機圖在 `assets/phone_mockup.png`，想換款式就產一張螢幕是純綠色（#00FF00）的手機圖取代它。
 
@@ -79,6 +82,7 @@
 | `assets/paper_texture.png` | `paper-collage` 用的紙張紋理 |
 | `scripts/track_object.py` | 物品追蹤，讓塗鴉圈跟著物品移動 |
 | `fonts/NotoSansTC-VF.ttf` | 思源黑體繁中版（SIL OFL 授權，可商用） |
+| `fonts/NotoSerifTC-VF.ttf` | 思源宋體繁中版，襯線風格特效的中文用它（SIL OFL） |
 
 原版的 `scripts/fx.py` 完全沒有修改。
 

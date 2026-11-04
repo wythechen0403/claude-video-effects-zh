@@ -25,10 +25,14 @@ ZH_FONT = next((p for p in (
     '/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc',
 ) if os.path.exists(p)), None)
 
+# serif display fonts get Noto Serif TC so editorial looks keep their character
+ZH_SERIF = next((p for p in (os.path.join(ROOT, 'fonts', 'NotoSerifTC-VF.ttf'),) if os.path.exists(p)), None)
+_SERIF_FILES = ('InstrumentSerif', 'PlayfairDisplay')
+
 # weight for each stock font file (heavier display fonts -> heavier Chinese)
 _WEIGHT_BY_FILE = {
     'ArchivoBlack': 900, 'Anton': 900, 'PermanentMarker': 700, 'SpaceMono': 700,
-    'Montserrat': 800, 'PlayfairDisplay': 700, 'InstrumentSerif': 500, 'Inter': 600,
+    'Montserrat': 800, 'PlayfairDisplay': 700, 'InstrumentSerif': 600, 'Inter': 600,
 }
 
 
@@ -51,11 +55,13 @@ def _weight_for(f):
 _cache = {}
 def _zh(f):
     """Noto Sans TC at the same size as font f, with a matching weight."""
-    if ZH_FONT is None or f is None or getattr(f, 'path', None) == ZH_FONT:
+    if ZH_FONT is None or f is None or getattr(f, 'path', None) in (ZH_FONT, ZH_SERIF):
         return f
-    key = (int(f.size), _weight_for(f))
+    name = os.path.basename(getattr(f, 'path', '') or '')
+    serif = ZH_SERIF is not None and name.startswith(_SERIF_FILES)
+    key = (int(f.size), _weight_for(f), serif)
     if key not in _cache:
-        z = ImageFont.truetype(ZH_FONT, key[0])
+        z = ImageFont.truetype(ZH_SERIF if serif else ZH_FONT, key[0])
         try:
             z.set_variation_by_axes([key[1]])
         except Exception:

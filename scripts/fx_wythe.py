@@ -715,6 +715,239 @@ def _paper_tile(ch, size, col, fg, r, u):
     return im
 
 
+# headline cards: messages from everywhere pile up behind you, faster and faster, until the wall is about to overflow
+_PILE = [
+    ('news', 'Claude 一句話剪出[九宮格]特效', '科技新報 · 台北'), ('social', 'wait, this was edited by Claude??', '@alex.makes · LA'),
+    ('sticky', '不用剪輯軟體', ''), ('black', 'ONE PROMPT', ''), ('comment', '求教學！！', '@小芸 · 台中'),
+    ('news', '動画編集、もう[アプリ]いらない？', '日経クロストレンド · Tokyo'), ('mono', '> render done · 4K', ''),
+    ('social', '零基礎也能[上手]，我試了', '@阿哲 · 高雄'), ('sticky', '一句話就好', ''), ('black', '九種特效', ''),
+    ('comment', 'How?!', '@maya · London'), ('news', 'Creators are [ditching] editing apps', 'The Verge · New York'),
+    ('social', 'え、これ全部AI？', '@みき · Osaka'), ('mono', '$ claude /effects', ''), ('sticky', 'CapCut 做很久', ''),
+    ('comment', '教練我想學', '@Ivy · 香港'), ('black', 'NO TIMELINE', ''), ('news', '剪輯師[3 分鐘]下班', '數位時代 · 台北'),
+    ('social', 'no keyframes. none.', '@ken.edits · Sydney'), ('sticky', '人物自動摳好', ''), ('comment', '神作', '@小美 · 新竹'),
+    ('mono', '> effects: 9 / 9', ''), ('news', '[中文]字型也能用', '自由時報 · 台南'), ('black', 'FULL REEL', ''),
+    ('social', 'saved this for later', '@jules · Paris'), ('comment', 'すごい', '@yuta · 京都'), ('sticky', '免費開源', ''),
+    ('news', '一支影片，[九種]特效', 'INSIDE · 台北'), ('comment', '怎麼做的？', '@Leo · 新加坡'), ('black', '爆款', ''),
+    ('social', 'my editor is shaking rn', '@sam · Toronto'), ('sticky', '我的九宮格', ''), ('mono', '> cutout ok', ''),
+    ('comment', 'Need this', '@nina · Berlin'),
+]
+
+
+def _pile_card(kind, text, src, W, rng):
+    from PIL import Image, ImageDraw
+    u = W / 1080; s = rng.uniform(0.95, 1.9)
+    def marked(d, f, txt, x, y, fill, lh):
+        plain = txt.replace('[', '').replace(']', ''); on = False; xx = x
+        for ch in txt:
+            if ch == '[': on = True; continue
+            if ch == ']': on = False; continue
+            wch = f.getlength(ch)
+            if on: d.rectangle([xx - 1, y + lh * 0.42, xx + wch + 1, y + lh * 0.95], fill=(255, 226, 64, 255))
+            xx += wch
+        d.text((x, y), plain, font=f, fill=fill)
+    if kind == 'news':
+        f = fx.font('didoneb', 40 * u * s); cw = int(min(W * 0.62, f.getlength(text.replace('[', '').replace(']', '')) + 56 * u * s))
+        ch = int(f.size * 1.4 + 70 * u * s); im = Image.new('RGBA', (cw, ch), (246, 242, 232, 255)); d = ImageDraw.Draw(im)
+        d.line([22 * u * s, 18 * u * s, cw - 22 * u * s, 18 * u * s], fill=(20, 20, 20, 255), width=max(1, int(2 * u)))
+        marked(d, f, text, 24 * u * s, 26 * u * s, (18, 18, 18, 255), f.size * 1.3)
+        d.text((24 * u * s, ch - 30 * u * s), src, font=fx.font('uim', 20 * u * s), fill=(110, 105, 95, 255))
+    elif kind == 'social':
+        f = fx.font('uim', 30 * u * s); cw = int(min(W * 0.6, max(f.getlength(text.replace('[', '').replace(']', '')), 200 * u * s) + 60 * u * s))
+        ch = int(110 * u * s); im = fx.rrect(cw, ch, 18 * u * s, (255, 255, 255, 255)); d = ImageDraw.Draw(im)
+        hue = rng.choice([(255, 140, 120), (120, 170, 255), (130, 210, 160), (220, 150, 255)])
+        d.ellipse([18 * u * s, 16 * u * s, 50 * u * s, 48 * u * s], fill=hue + (255,))
+        d.text((60 * u * s, 32 * u * s), src, font=fx.font('uib', 20 * u * s), fill=(90, 90, 96, 255), anchor='lm')
+        marked(d, f, text, 20 * u * s, 58 * u * s, (20, 20, 24, 255), f.size * 1.3)
+    elif kind == 'sticky':
+        col = rng.choice([(255, 232, 92), (255, 176, 196), (170, 230, 255), (190, 245, 170)])
+        f = fx.font('hand', 44 * u * s); side = int(max(200 * u * s, f.getlength(text) * 0.6))
+        im = Image.new('RGBA', (side, side), col + (255,)); d = ImageDraw.Draw(im)
+        lines = _wrap(f, text, side - 30 * u * s)
+        for i, ln in enumerate(lines): d.text((side / 2, side / 2 + (i - (len(lines) - 1) / 2) * f.size * 1.2), ln, font=f, fill=(30, 30, 30, 255), anchor='mm')
+    elif kind == 'comment':
+        f = fx.font('uib', 34 * u * s); tw = f.getlength(text); cw = int(tw + 50 * u * s); ch = int(f.size * 1.6 + 44 * u * s)
+        col = rng.choice([(10, 132, 255), (233, 233, 238)]); fg = (255, 255, 255) if col[0] < 100 else (20, 20, 24)
+        im = fx.rrect(cw, ch, ch * 0.4, col + (255,)); d = ImageDraw.Draw(im)
+        d.text((cw / 2, ch * 0.42), text, font=f, fill=fg + (255,), anchor='mm')
+        d.text((cw / 2, ch - 16 * u * s), src, font=fx.font('uim', 16 * u * s), fill=fg + (180,), anchor='mm')
+    elif kind == 'black':
+        f = fx.font('anton', 64 * u * s); cw = int(f.getlength(text) + 50 * u * s); ch = int(f.size * 1.35)
+        im = Image.new('RGBA', (cw, ch), (16, 16, 16, 255)); ImageDraw.Draw(im).text((cw / 2, ch / 2), text, font=f, fill=(255, 255, 255, 255), anchor='mm')
+    else:  # mono
+        f = fx.font('mono', 28 * u * s); cw = int(f.getlength(text) + 40 * u * s); ch = int(f.size * 2)
+        im = fx.rrect(cw, ch, 10 * u * s, (18, 24, 22, 255)); ImageDraw.Draw(im).text((20 * u * s, ch / 2), text, font=f, fill=(120, 255, 160, 255), anchor='lm')
+    return fx.shadowed(im, 10, 6, 100)
+
+
+@fx.effect('headline-cards', 'messages from everywhere pile up behind you, faster and faster, until the wall is about to overflow')
+def fx_headline_cards(c, e):
+    import random
+    W, H = c.W, c.H
+    if e.o.get('text'):
+        items = [('news' if i % 3 == 0 else 'social' if i % 3 == 1 else 'sticky', t, '') for i, t in enumerate(str(e.o['text']).split('|')) if t]
+    else:
+        n = int(e.o.get('count', len(_PILE) * 2)); items = [_PILE[i % len(_PILE)] for i in range(n)]
+    N = len(items)
+    cards = fx.cached(e, 'pile', lambda: [_pile_card(k, t, src, W, random.Random(i * 17 + 3)) for i, (k, t, src) in enumerate(items)])
+    def layout():
+        out = []
+        for i in range(N):
+            r = random.Random(i * 29 + 5)
+            x = r.uniform(-0.08, 1.08) * W
+            y = (r.uniform(-0.02, 0.7) if r.random() < 0.75 else r.uniform(0.7, 0.98)) * H
+            out.append((x, y, r.uniform(-13, 13)))
+        return out
+    pos = fx.cached(e, 'pos', layout)
+    T = e.d * float(e.o.get('fill', 0.9)); out = fx.clamp((e.d - c.lt) / 0.2)
+    for i in range(N):
+        t0 = T * ((i / max(1, N - 1)) ** 0.55)   # gaps shrink: the pile speeds up
+        if c.lt < t0: break
+        x, y, rot = pos[i]; k = fx.ease_back((c.lt - t0) / 0.18)
+        fx.place(c, cards[i], x, y, 0.4 + 0.6 * k, rot, out * fx.clamp((c.lt - t0) / 0.05), behind=True)
+
+
+# crayon doodle: a boiling white crayon outline around you, plus a crayon heart, star, sparkles and excitement marks
+def _crayon_layer(H, W, draw_fn, step):
+    import numpy as np, cv2
+    from PIL import Image, ImageDraw
+    im = Image.new('L', (W, H), 0); draw_fn(ImageDraw.Draw(im))
+    a = np.asarray(im, np.float32) / 255
+    rng = np.random.default_rng(step)
+    grain = (rng.random((H // 2, W // 2)) > 0.22).astype(np.float32)
+    grain = cv2.resize(grain, (W, H), interpolation=cv2.INTER_NEAREST)
+    return a * (0.55 + 0.45 * grain)
+
+
+@fx.effect('crayon-doodle', 'a wobbly white crayon outline traces you, with a crayon heart, star, sparkles and excitement marks')
+def fx_crayon_doodle(c, e):
+    import math
+    import numpy as np, cv2
+    W, H = c.W, c.H; u = W / 1080
+    step = int(c.lt * float(e.o.get('boil', 8)))
+    rng = np.random.default_rng(step + 101)
+    out = fx.clamp((e.d - c.lt) / 0.25); k = fx.clamp(c.lt / 0.25)
+    # outline: the person's silhouette pushed out a little, redrawn with a hand wobble
+    m = (c.m > 0.4).astype(np.uint8)
+    off = int(W * float(e.o.get('gap', 0.022)))
+    big = cv2.dilate(m, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * off + 1, 2 * off + 1)))
+    cs, _ = cv2.findContours(big, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    lw = max(4, int(W * float(e.o.get('width', 0.007))))
+    def outline(d):
+        for cnt in cs:
+            if len(cnt) < 40: continue
+            pts = cnt[::6, 0, :].astype(np.float32)
+            pts += rng.normal(0, 1.6 * u, pts.shape).astype(np.float32)
+            d.line([tuple(p) for p in pts] + [tuple(pts[0])], fill=255, width=lw, joint='curve')
+    a = _crayon_layer(H, W, outline, step) * k * out
+    white = np.ones((H, W, 3), np.float32)
+    fx.comp(c, np.dstack([white, a]), 0, 0, 1, behind=True)
+    # doodles around the head, in crayon colours
+    sz = max(c.fw, W * 0.09) * float(e.o.get('size', 1.0))
+    def doodle(t0, colour, fn):
+        if c.lt < t0: return
+        kk = fx.ease_back((c.lt - t0) / 0.25)
+        lay = _crayon_layer(H, W, lambda d: fn(d, kk), step + int(t0 * 10))
+        rgb = np.empty((H, W, 3), np.float32); rgb[:] = np.float32(colour) / 255
+        fx.comp(c, np.dstack([rgb, lay * out]), 0, 0, 1, behind=True)
+    fx_, fy_ = c.fx, c.fy
+    def heart(d, kk):
+        cx, cy, r = fx_ - sz * 1.75, fy_ + sz * 0.35, sz * 0.42 * kk
+        if r < 2: return
+        d.ellipse([cx - r, cy - r * 0.9, cx, cy + r * 0.1], fill=255); d.ellipse([cx, cy - r * 0.9, cx + r, cy + r * 0.1], fill=255)
+        d.polygon([(cx - r * 0.97, cy - r * 0.25), (cx + r * 0.97, cy - r * 0.25), (cx, cy + r * 1.05)], fill=255)
+    def star(d, kk):
+        cx, cy, r = fx_ + sz * 1.75, fy_ + sz * 0.05, sz * 0.45 * kk
+        if r < 2: return
+        pts = [(cx + (r if i % 2 == 0 else r * 0.45) * math.cos(-math.pi / 2 + i * math.pi / 5), cy + (r if i % 2 == 0 else r * 0.45) * math.sin(-math.pi / 2 + i * math.pi / 5)) for i in range(10)]
+        d.polygon(pts, fill=255)
+    def sparkles(d, kk):
+        for sx, sy, sr in ((-2.1, -0.9, 0.18), (-1.4, 1.2, 0.13), (2.2, -1.2, 0.16), (2.3, 1.0, 0.12), (-0.9, -1.7, 0.1)):
+            cx, cy, r = fx_ + sz * sx, fy_ + sz * sy, sz * sr * kk
+            if r < 1: continue
+            d.polygon([(cx, cy - r), (cx + r * 0.25, cy - r * 0.25), (cx + r, cy), (cx + r * 0.25, cy + r * 0.25), (cx, cy + r), (cx - r * 0.25, cy + r * 0.25), (cx - r, cy), (cx - r * 0.25, cy - r * 0.25)], fill=255)
+    def marks(d, kk):
+        bx, by = fx_ + sz * 1.25, fy_ - sz * 1.35
+        for j, ang in enumerate((-60, -35, -10)):
+            a_ = math.radians(ang); L = sz * 0.38 * kk; x0, y0 = bx + j * sz * 0.22, by + j * sz * 0.12
+            d.line([(x0, y0), (x0 + L * math.cos(a_), y0 + L * math.sin(a_))], fill=255, width=max(4, int(W * 0.007)))
+    doodle(0.15, fx.rgb(e.o.get('heart'), (250, 110, 150)), heart)
+    doodle(0.3, fx.rgb(e.o.get('star'), (255, 222, 70)), star)
+    doodle(0.45, (255, 255, 255), sparkles)
+    doodle(0.55, fx.rgb(e.o.get('star'), (255, 222, 70)), marks)
+
+
+# magazine cover: editorial typography only, black or white, no outlines or shadows; the masthead sits behind your head
+def _type(text, kind, size, col, track=0.0):
+    """Plain text image, optional letter-spacing (track, in em). No stroke, no shadow."""
+    from PIL import Image, ImageDraw
+    f = fx.font(kind, size)
+    if track <= 0:
+        bb = f.getbbox(text); im = Image.new('RGBA', (bb[2] - bb[0] + 4, bb[3] - bb[1] + 4), (0, 0, 0, 0))
+        ImageDraw.Draw(im).text((2 - bb[0], 2 - bb[1]), text, font=f, fill=col + (255,)); return im
+    gap = size * track; w = sum(f.getlength(ch) for ch in text) + gap * max(0, len(text) - 1)
+    asc, desc = f.getmetrics(); im = Image.new('RGBA', (int(w) + 4, asc + desc + 4), (0, 0, 0, 0)); d = ImageDraw.Draw(im); x = 2
+    for ch in text: d.text((x, 2), ch, font=f, fill=col + (255,)); x += f.getlength(ch) + gap
+    return im
+
+
+def _vtype(text, kind, size, col, gap=0.08):
+    """Vertical text, one character under another (for Chinese editorial headlines)."""
+    from PIL import Image, ImageDraw
+    f = fx.font(kind, size); step = size * (1 + gap)
+    im = Image.new('RGBA', (int(size * 1.15), int(step * len(text) + size * 0.2)), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    for i, ch in enumerate(text): d.text((im.width / 2, size * 0.55 + i * step), ch, font=f, fill=col + (255,), anchor='mm')
+    return im
+
+
+@fx.effect('magazine-cover', 'you become an editorial magazine cover: big serif masthead behind your head, cover lines in black or white')
+def fx_magazine_cover(c, e):
+    W, H = c.W, c.H; u = W / 1080
+    ink = (255, 255, 255) if e.o.get('color', 'black') == 'white' else (14, 14, 14)
+    mast = e.o.get('text', 'STUDIO')
+    kicker = e.o.get('kicker', '封面故事')
+    heads = [x for x in str(e.o.get('lines', '一句話|剪出一支片')).split('|') if x]
+    sub = e.o.get('sub', '不用剪輯師也不用軟體')
+    right = [x for x in str(e.o.get('right', 'Claude|親手剪的')).split('|') if x]
+    issue = e.o.get('issue', '2026 · 十一月號 · NO.11'); foot = e.o.get('foot', 'AI EDIT')
+    def build():
+        # masthead fitted to the width
+        size = int(W * 0.3)
+        while fx.font('didoneb', size).getlength(mast) > W * 0.9 and size > 40: size = int(size * 0.96)
+        el = {'mast': _type(mast, 'didoneb', size, ink), 'issue': _type(issue, 'uim', 24 * u, ink, 0.18),
+              'kicker': _type(kicker, 'uim', 24 * u, ink, 0.35),
+              'heads': [_vtype(h, 'didoneb', 92 * u, ink) for h in heads],
+              'sub': _vtype(sub, 'uim', 26 * u, ink, 0.12), 'foot': _type(foot, 'uim', 22 * u, ink, 0.4),
+              'right': [_type(r, 'didonei' if i == 0 else 'didoneb', (58 if i == 0 else 64) * u, ink) for i, r in enumerate(right)]}
+        return el
+    el = fx.cached(e, 'type', build)
+    out = fx.clamp((e.d - c.lt) / 0.3)
+    def show(im, x, y, t0, anchor='l', behind=True):
+        if c.lt < t0: return
+        k = fx.ease_out((c.lt - t0) / 0.35); a = out * fx.clamp((c.lt - t0) / 0.25)
+        cx = x + im.width / 2 if anchor == 'l' else (x - im.width / 2 if anchor == 'r' else x)
+        fx.place(c, im, cx, y + im.height / 2 + (1 - k) * 18 * u, 1, 0, a, behind=behind)
+    # a gentle editorial grade (slightly warm, slightly more contrast)
+    g = fx.clamp(c.lt / 0.4) * out * 0.5
+    if g > 0: c.img = c.img * (1 - g) + fx.np.clip((c.img - 0.5) * 1.08 + 0.5 + fx.np.float32([0.012, 0.004, -0.01]), 0, 1) * g
+    m = el['mast']; top = H * float(e.o.get('top', 0.035))
+    show(el['issue'], W / 2, top, 0.05, 'c')
+    # masthead: its lower part goes behind the head
+    my = max(top + el['issue'].height + 10 * u, (c.fy - c.fw * 0.9) - m.height * 0.62)
+    show(m, W / 2, my, 0.0, 'c')
+    # vertical headlines, read right to left, in the column left of the body
+    x0 = W * 0.06; y = H * float(e.o.get('y', 0.4))
+    show(el['kicker'], x0, y, 0.35); y += el['kicker'].height + 22 * u
+    xr_col = x0 + sum(h.width for h in el['heads']) + 4 * u * len(el['heads'])
+    xx = xr_col
+    for i, h in enumerate(el['heads']):
+        xx -= h.width; show(h, xx, y, 0.45 + i * 0.12); xx -= 4 * u
+    show(el['sub'], xr_col + 10 * u, y + 8 * u, 0.75)
+    xr = W * 0.935; yr = H * 0.76
+    for i, r in enumerate(el['right']):
+        show(r, xr, yr, 0.9 + i * 0.1, 'r'); yr += r.height + 4 * u
+    show(el['foot'], x0, H * 0.955 - el['foot'].height, 1.1)
+
+
 fx.CARD_FX = tuple(fx.CARD_FX) + ('phone-orbit',)
 
 if __name__ == '__main__':
