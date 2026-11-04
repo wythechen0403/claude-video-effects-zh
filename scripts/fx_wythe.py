@@ -494,7 +494,7 @@ def _real_phone(c, e, screen, flip, key='asset'):
     return pim, shadow, quad
 
 
-@fx.effect('phone-orbit', 'photo cards rise out of a floating phone and spin in a ring above it')
+@fx.effect('phone-orbit', 'a giant phone stands beside you; photo cards burst out of it and spin in a 3D ring above it')
 def fx_phone_orbit(c, e):
     import math, os
     from PIL import Image
@@ -502,7 +502,7 @@ def fx_phone_orbit(c, e):
     side = e.o.get('side', 'left'); flip = side != 'left'; sgn = 1 if side == 'left' else -1
     if not os.path.exists(e.o.get('phone', os.path.join(fx.ROOT, 'assets', 'phone_mockup.png'))):
         return fx.EFFECTS['orbit'][0](c, e)
-    K = int(e.o.get('count', 5)); cw = int(W * float(e.o.get('card', 0.11)))
+    K = int(e.o.get('count', 6)); cw = int(W * float(e.o.get('card', 0.25)))
     cards = fx.cached(e, 'cards', lambda: [fx.card(fx.vary(im, i) if e.o.get('images') is None else im, cw) for i, im in enumerate(e.cards)])
     def scr():
         im = Image.new('RGB', (460, 1000), (16, 16, 18))
@@ -511,16 +511,17 @@ def fx_phone_orbit(c, e):
         return im
     screen = fx.cached(e, 'screen', scr)
     phone, shadow, quad = fx.cached(e, 'phone', lambda: _real_phone(c, e, screen, flip))
-    ph = H * float(e.o.get('size', 0.30)); sc = ph / phone.height
+    ph = H * float(e.o.get('size', 0.72)); sc = ph / phone.height
     k = fx.ease_back(c.lt / 0.45); out = fx.clamp((e.d - c.lt) / 0.25); al = out * fx.clamp(c.lt / 0.12)
-    px = W * float(e.o.get('x', 0.19 if side == 'left' else 0.81)); py = H * float(e.o.get('y', 0.58))
+    px = W * float(e.o.get('x', 0.3 if side == 'left' else 0.7)); py = H * float(e.o.get('y', 0.6))
     py += math.sin(c.lt * 2.2) * H * 0.005 + (1 - k) * H * 0.2
-    s = 0.85 + 0.15 * k; rot = float(e.o.get('tilt', 3)) * sgn
+    s = 0.85 + 0.15 * k; rot = float(e.o.get('tilt', 3)) * sgn + math.sin(c.lt * 3.1) * float(e.o.get('wobble', 2))
     # the ring sits just above the phone's screen top
     top = py - ph * s / 2
     rise = fx.ease_out((c.lt - 0.25) / 0.6)
-    ox = px; oy = top + (1 - rise) * ph * 0.35 - H * float(e.o.get('lift', 0.07)) * rise
-    rx = min(W * float(e.o.get('radius', 0.15)), (px if sgn == 1 else W - px) - cw * 0.55) * rise; ry = H * float(e.o.get('ring', 0.045)) * rise
+    ox = px; oy = top + (1 - rise) * ph * 0.35 - H * float(e.o.get('lift', 0.05)) * rise
+    rx = W * float(e.o.get('radius', 0.3)) * rise; ry = H * float(e.o.get('ring', 0.09)) * rise
+    if e.o.get('clamp', '0') == '1': rx = min(rx, ((px if sgn == 1 else W - px) - cw * 0.55) * rise)
     items = []
     for i in range(K):
         th = i * 2 * math.pi / K + c.lt * float(e.o.get('speed', 1.6))
